@@ -1,4 +1,5 @@
 const User = require('../Models/SignupModel.js');
+const bcrypt = require('bcrypt');
 
 const getAllUsers = async (req, res) => {
     try {
@@ -18,12 +19,15 @@ const createUser = async (req, res) => {
             return res.status(400).json({ message: "User with this email already exists" });
         }
         
+        const saltRounds = 12;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        
         const newUser = new User({
             firstname,
             lastname,
             email,
             phone,
-            password,
+            password: hashedPassword,
             role: role || 'user'
         });
         
@@ -45,6 +49,11 @@ const updateUser = async (req, res) => {
             if (existingUser) {
                 return res.status(400).json({ message: "Email already exists" });
             }
+        }
+        
+        if (updateData.password) {
+            const saltRounds = 12;
+            updateData.password = await bcrypt.hash(updateData.password, saltRounds);
         }
         
         const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password');

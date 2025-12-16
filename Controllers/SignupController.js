@@ -1,4 +1,5 @@
 const User=require('../Models/SignupModel.js');
+const bcrypt = require('bcrypt');
 const signupUser=async(req,res)=>{
     try{
         const {firstname,lastname,phone,email,password}=req.body;
@@ -8,12 +9,15 @@ const signupUser=async(req,res)=>{
             return res.status(400).json({message:"User with this email already exists"});
         }
         
+        const saltRounds = 12;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        
         const newUser=new User({
             firstname,
             lastname,
             email,
             phone,
-            password,
+            password: hashedPassword,
         });
         const savedUser=await newUser.save();
         res.status(201).json({message:"User signed up successfully",user:savedUser});         
