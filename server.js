@@ -14,18 +14,55 @@ const DEPLOYMENT_INFO = {
 };
 
 console.log('🚀 Backend Deployment Info:', DEPLOYMENT_INFO);
+
+// Environment validation
+if (!process.env.MONGO_URL) {
+    console.error('❌ MONGO_URL environment variable is required');
+    process.exit(1);
+}
+if (!process.env.JWT_SECRET) {
+    console.error('❌ JWT_SECRET environment variable is required');
+    process.exit(1);
+}
+console.log('✅ Environment variables validated');
 const app=express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
-app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-frontend-domain.com', 'http://localhost:5173']
-        : 'http://localhost:5173',
+// CORS configuration for production
+const corsOptions = {
+    origin: [
+        'https://jaiadhithyak.netlify.app',
+        'http://localhost:5173',
+        'http://localhost:3000'
+    ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Origin',
+        'X-Requested-With', 
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'Cache-Control'
+    ],
+    optionsSuccessStatus: 200,
+    preflightContinue: false
+};
+
+app.use(cors(corsOptions));
+
+// Explicit preflight handler for all routes
+app.options('*', (req, res) => {
+    const origin = req.headers.origin;
+    if (corsOptions.origin.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+});
 const signupRoutes=require('./Routers/SignupRoutes.js');
 const loginRoutes=require('./Routers/LoginRoutes.js');
 const userRoutes=require('./Routers/UserRoutes.js');
@@ -34,13 +71,17 @@ const forgotPasswordRoutes=require('./Routers/ForgotPasswordRoutes.js');
 const subscriptionRoutes=require('./Routers/SubscriptionRoutes.js');
 const contactRoutes=require('./Routers/ContactRoutes.js');
 const { authenticateToken, requireAdmin } = require('./auth.js');
-// Health check endpoint with version info
+// Health check endpoint with CORS info
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'OK',
         ...DEPLOYMENT_INFO,
         uptime: process.uptime(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        cors: {
+            allowedOrigins: corsOptions.origin,
+            methods: corsOptions.methods
+        }
     });
 });
 
@@ -49,8 +90,14 @@ app.get('/api/version', (req, res) => {
     res.json(DEPLOYMENT_INFO);
 });
 
+// Additional CORS headers middleware
 app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
+    const origin = req.headers.origin;
+    if (corsOptions.origin.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log(`${req.method} ${req.path} - Origin: ${origin}`);
     next();
 });
 
